@@ -1,0 +1,107 @@
+﻿SIH26123      
+Edge-AI Decentralized Fleet Coordination for Autonomous Mobile Robots
+A simulation-first platform where warehouse robots coordinate peer-to-peer, keep moving when the network fails, and prove a measured throughput gain over the conventional stop-and-wait approach.
+1. The problem, in plain terms
+Warehouse robots normally take their orders from a single central server. That server decides who goes where and stops two robots from wanting the same spot. It works until the moment it does not: a Wi-Fi access point drops for a few seconds, a metal rack creates a radio dead zone, or the link to the server lags. When that happens, every robot depending on the tower hesitates, waits, or stops. In a building where labour is the single largest running cost, seconds of idle robots add up quickly across a shift.
+The task is to remove that single point of failure. Instead of a central brain, each robot runs its own planner on a small onboard computer and talks directly to its neighbours, sharing where it is and where it intends to go. When two robots approach the same narrow aisle, they settle the order between themselves. When an aisle is blocked, the fleet reroutes and reassigns work without anyone re-entering goals. The whole thing is demonstrated in simulation, and it is judged on two hard numbers: zero robot-to-robot collisions, and at least a 20% lower completion time than a fair stop-and-wait baseline on overlapping paths.
+2. Our solution
+We build each robot as a self-contained onboard stack and let coordination emerge from messages between robots, never from shared memory or a hidden coordinator. The honesty test we hold ourselves to is simple: no robot’s planner is ever allowed to read another robot’s memory. The only thing that crosses between robots is a small message that can be delayed, dropped, or captured on the wire, exactly as a real radio packet can. If shutting down the dashboard or any single process changes how another robot behaves, that process was secretly the tower, and we have failed the brief.
+Each robot carries the same five capabilities, layered from fast-and-reactive to slow-and-strategic:
+* Safety and local avoidance. An ORCA velocity filter running about twenty times a second stops a robot hitting anything in the next moment. It is cheap enough to run on a Raspberry Pi.
+* Choke-point negotiation. When robots meet at a single-lane aisle or an intersection, a lightweight token and priority rule decides who passes first, so nobody freezes and nobody collides.
+* Onboard path planning. An A* route over a 2D map of the warehouse, repaired with D* Lite the instant an aisle is blocked.
+* Decentralized task allocation. Robots bid for pickups and reach agreement among themselves, so two robots never double-book a job and a dropped robot’s work returns to the pool.
+* Comms-loss mode. If a robot goes radio-silent, its neighbours treat its last known intent as an obstacle and route around it, while the isolated robot falls back to purely local avoidance until the link returns.
+A monitoring dashboard watches every robot’s position, battery and task, and shows each robot’s own local view so a supervisor can see why a robot yielded. The dashboard only ever subscribes; it never drives. Killing it mid-run does not stop a single robot, and that is exactly the point.
+3. Technical architecture
+The demo runs on one laptop. Each robot is a separate Docker container with its own CPU and memory budget, so the isolation is visible and provable. Gazebo Harmonic provides the 3D warehouse world, using the open AWS small-warehouse layout with shelves, pallets and narrow aisles, and a sixth process is the subscribe-only dashboard. The same container that runs in Docker is what flashes onto a real Raspberry Pi 5 or Jetson Orin, which is how the “runs on edge hardware” requirement is met honestly, without pretending the simulator itself runs on a Pi. A headless 2D version of the same planner runs ten seeded trials to produce the benchmark numbers.
+  
+
+The layered stack, per robot
+Layer
+	Rate
+	What it does and why
+	Safety filter
+	20 Hz
+	ORCA velocity avoidance. Turns “don’t hit anything now” into a tiny math problem. Cheap on a Pi.
+	Tracker
+	20 Hz
+	Nav2 or pure-pursuit follows the assigned path. Not the multi-robot brain, just the wheels.
+	Choke protocol
+	on event
+	Corridor / intersection token. Prevents the freeze plain avoidance causes in a one-lane aisle.
+	Coordination
+	2–10 Hz
+	Windowed PIBT using only radio neighbours. Priority inheritance resolves cyclic deadlock.
+	Global path
+	on event
+	A* to the goal; D* Lite re-plans the moment an aisle is blocked.
+	Task allocation
+	on event
+	Consensus bundle auction (CBBA) over the mesh. Decentralized, no dispatcher.
+	Transport
+	10 Hz
+	Zenoh peer-to-peer messaging. Survives lossy Wi-Fi where default ROS discovery melts down.
+	
+
+The rule that ties it together: the coordinator library never imports the simulator or the messaging framework. It takes a map, the robot’s own state and its neighbours’ messages, and returns a path or a velocity. That is what lets the identical code run in Gazebo on the laptop and on a Pi over real Wi-Fi.
+4. Algorithms and machine learning
+The classical algorithms are the product. Machine learning is added on top of only three modules, and always behind a collision shield, so it can improve behaviour but can never cause a crash. We never claim the 20% gain comes from a neural network; it comes from the coordination algorithms below, and ML makes them a little smarter.
+Why each algorithm
+* PIBT for coordination, not CBS. Optimal solvers like CBS are slow and effectively central; they do not fit a Pi or a no-tower rule. PIBT is fast, runs on each robot using only its radio neighbours, and its priority-inheritance step is what actually breaks a cyclic deadlock.
+* ORCA for the safety layer. It reduces “avoid everyone in the next instant” to a small linear program that solves in milliseconds, has an open Apache library, and is the field standard. Control barrier functions are a valid alternative but add solver-feasibility problems we do not need in flat aisles.
+* A* and D* Lite for paths. A* finds the route; D* Lite repairs it incrementally the instant an aisle is blocked, instead of re-planning from scratch.
+* CBBA for tasks. A consensus auction lets robots agree who takes each pickup with no central dispatcher, and heals double-booking when a dropped robot rejoins.
+Where machine learning helps (three small, optional forks)
+* Perception. A tiny YOLO11n or EfficientDet-lite model on the robot spots people, pallets and blocked aisles from the camera and marks those cells as obstacles. It runs on a Pi at a few frames a second.
+* Travel-time prediction. A small regressor (ridge or a two-layer network) learns how long a route really takes under congestion, replacing naive straight-line distance in the task-allocation bids. This is the honest ML contribution, trained on the team’s own simulation logs.
+* Local move preference. A 19 KB Follower-lite network suggests the next move, then the PIBT shield checks and repairs it, so a bad suggestion can never cause a collision. Unplug the network and the classical planner still works.
+Every ML piece is additive and reversible: remove any of them and the fleet still runs, still avoids collisions, and still beats the baseline. That is the safe way to earn the “Edge-AI” in the title without betting the demo on a model.
+5. Finances
+Our deliverable is software, so the important number is not a price tag but the shape of the economics: the software has near-zero marginal cost. It is built entirely on open tools (ROS 2, Gazebo, Zenoh, ORCA, the PIBT and CBBA algorithms), so building it costs the team’s time rather than money, and copying it to one more robot or one more warehouse costs nothing. There is no per-robot licence in our design. The whole prototype costs under $600 to build, because the robots are simulated and the compute is three Raspberry Pis; that is a build cost, not a deployment cost.
+What a real deployment costs is dominated by the robot hardware a warehouse buys regardless of which coordinator runs on it. The table separates the two so a judge can see where our software actually sits.
+Cost item
+	Estimate
+	Basis
+	Software itself
+	Near-zero marginal cost
+	Open-source core built on ROS 2, Gazebo, Zenoh, ORCA. Copying it to one more robot or site costs nothing. No per-robot licence.
+	Compute per robot
+	$80 – $600
+	Raspberry Pi 5, or Jetson Orin Nano if vision is added. Hardware the robot carries anyway.
+	On-prem site server
+	$2k – $8k
+	One industrial PC for the fleet-wide dashboard. Replaces recurring cloud fees. Optional.
+	Per robot, all-in (industry)
+	$25k – $60k
+	The mobile robot itself dominates. Our software is a thin layer on hardware the site buys regardless.
+	Networking retrofit
+	$10k – $50k
+	Wi-Fi 6 or private-5G redesign for an existing building, the exposure our fail-soft design reduces.
+	
+
+Read the table top to bottom: the software line is effectively free, the compute it needs is hardware already on the robot, and the large numbers belong to the robot and the building, not to us. That is the point of a software play, a small, high-leverage layer on top of capital the site has already spent.
+6. Impact and money saved
+A coordinator that keeps robots moving and cuts completion time pays for itself against two documented costs: downtime and labour. Warehouse downtime runs $5,000 to $100,000 an hour, and in a 2026 survey nearly half of operators reported idling their automation because of connectivity or software problems. Labour is 50 to 70 percent of warehouse operating cost, with wages near $26.85 an hour by mid-2026. Amazon’s own coordination model booked a 10 percent travel-time gain on an already-optimized fleet, so a 20 percent gain against a plain stop-and-wait baseline is a realistic, not inflated, target.
+For a mid-size site of around fifty robots, the yearly savings look like this. The figures are planning estimates built from the public numbers above, not a customer quote.
+Source of saving
+	Per year
+	How it is derived
+	Downtime avoided (fail-soft)
+	$50k – $4M
+	Robots keep moving through Wi-Fi drops. 10–40 idle hours a year avoided at $5k–$100k per hour.
+	Throughput / labour leverage
+	$0.5M – $1M
+	A 20% cut in completion time is 10–20% more effective work from the same fleet and staff on coordinated tasks.
+	Deployment cost to earn it
+	$6k – $38k once
+	Compute for a 50-robot fleet plus one site server. Software adds no recurring licence.
+	
+
+The takeaway is the ratio. A one-time deployment cost in the tens of thousands, with software that adds no recurring fee, defends against downtime and labour losses measured in hundreds of thousands to millions a year. Even at the conservative end, a fail-soft coordinator that never freezes the building and squeezes a fifth more work out of the same fleet returns its cost many times over in a single year, which is exactly why the largest operators keep investing in coordination quality.
+7. Why this wins the room
+* The success bar is numeric. Zero collisions and a 20 percent gain are reported as measured results from ten seeded runs, not claims.
+* It is genuinely decentralized. Separate Docker containers and a visible packet stream let a judge confirm there is no hidden central planner, the mistake that catches most teams.
+* It handles the hard case. The demo drives robots into a single choke point and unjams it, rather than dodging the deadlock the brief actually names.
+* The edge story is real. The same code runs on a Raspberry Pi over real Wi-Fi, so “runs on edge hardware” is demonstrated, not asserted.
+* The economics are honest. Near-zero-cost software on top of hardware the site already owns, defending against six-figure yearly losses.

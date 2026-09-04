@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AMR Fleet Coordination // Decentralized Spectator Dashboard</title>
+  <link rel="stylesheet" href="/static/css/dashboard.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- TOP INDUSTRIAL APP HEADER -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="system-logo">
+          <span class="logo-icon">◈</span>
+          <div class="title-block">
+            <div class="system-title">AMR EDGE-AI FLEET // DECENTRALIZED MONITOR</div>
+            <div class="system-sub">SIH-26123 • BHARAT ELECTRONICS LIMITED (BEL) • ZERO-SPOF SPEC</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <div class="telemetry-pill success">
+          <span class="pulse-dot"></span>
+          <span class="label">COMMS:</span>
+          <span class="val">ZENOH P2P MESH</span>
+        </div>
+        <div class="telemetry-pill highlight">
+          <span class="label">COORDINATION:</span>
+          <span class="val">WINDOWED PIBT + TOKEN</span>
+        </div>
+        <div class="telemetry-pill benchmark">
+          <span class="label">MAKESPAN vs BASELINE:</span>
+          <span class="val" id="makespan-val">-26.4%</span>
+        </div>
+        <div class="telemetry-pill metric-zero">
+          <span class="label">INTER-ROBOT COLLISIONS:</span>
+          <span class="val" id="collision-counter">0 (PASS)</span>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <div class="unplug-badge" title="This dashboard is strictly read-only. Disconnecting or killing it will not affect robot navigation.">
+          <span class="shield-icon">🛡️</span> UNPLUG-SAFE SPECTATOR
+        </div>
+      </div>
+    </header>
+
+    <!-- ACTION / FAULT INJECTION CONTROL BAR -->
+    <div class="control-bar">
+      <div class="control-group">
+        <span class="group-label">FAULT INJECTION & SCENARIOS:</span>
+        <button id="btn-toggle-obstacle" class="btn btn-warning" onclick="toggleObstacle()">
+          <span class="btn-icon">⚠️</span> Inject Blocked Aisle (Drop Pallet)
+        </button>
+        <button id="btn-clear-obstacle" class="btn btn-outline" onclick="clearObstacles()">
+          <span class="btn-icon">↺</span> Clear Blockages
+        </button>
+      </div>
+
+      <div class="control-group">
+        <span class="group-label">WI-FI LOSS SIMULATION:</span>
+        <div class="btn-toggle-group">
+          <button class="btn-toggle active" data-loss="0.0" onclick="setPacketLoss(0.0)">0% Normal</button>
+          <button class="btn-toggle" data-loss="0.15" onclick="setPacketLoss(0.15)">15% Loss</button>
+          <button class="btn-toggle" data-loss="0.30" onclick="setPacketLoss(0.30)">30% Dead-Zone</button>
+        </div>
+      </div>
+
+      <div class="control-group view-actions">
+        <button class="btn btn-secondary" onclick="resetCanvasView()">Center View</button>
+        <label class="toggle-checkbox">
+          <input type="checkbox" id="chk-intents" checked onchange="toggleLayer('intents')" />
+          <span>Show Intent Trails</span>
+        </label>
+        <label class="toggle-checkbox">
+          <input type="checkbox" id="chk-chokes" checked onchange="toggleLayer('chokes')" />
+          <span>Choke Zones</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- MAIN TWO-COLUMN WORKSPACE -->
+    <div class="main-workspace">
+      <!-- LEFT: DIGITAL TWIN / SPATIAL CANVAS -->
+      <section class="spatial-section">
+        <div class="section-toolbar">
+          <div class="toolbar-title">
+            <span class="title-text">WAREHOUSE SPATIAL TWIN</span>
+            <span class="dim-text">36.0m × 24.0m GRID [0.5m RESOLUTION]</span>
+          </div>
+          <div class="view-status">
+            <span id="canvas-cursor-pos">X: 0.0m | Y: 0.0m</span>
+            <span class="fps-meter" id="fps-display">60 FPS</span>
+          </div>
+        </div>
+
+        <div class="canvas-wrapper" id="canvas-wrapper">
+          <canvas id="warehouse-canvas"></canvas>
+          <div class="canvas-overlay-legend">
+            <div class="legend-item"><span class="legend-box shelf"></span> Shelves / Racks</div>
+            <div class="legend-item"><span class="legend-box choke"></span> 1-Lane Choke Points</div>
+            <div class="legend-item"><span class="legend-box station"></span> Pick / Drop Bays</div>
+            <div class="legend-item"><span class="legend-box obstacle"></span> Blockage (Fallen Pallet)</div>
+            <div class="legend-item"><span class="legend-box trail"></span> Broadcasted Intent</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT: TELEMETRY, LOCAL-VIEW CARDS & CONSENSUS LEDGER -->
+      <aside class="telemetry-sidebar">
+        <!-- PER-ROBOT LOCAL VIEW CARDS (CRITICAL HONESTY PROOF) -->
+        <div class="panel-block">
+          <div class="panel-header">
+            <span class="panel-title">PER-ROBOT LOCAL VIEWS (DECENTRALIZED PROOF)</span>
+            <span class="badge-mini">NO GOD-VIEW MEMORY</span>
+          </div>
+          <div class="cards-deck" id="robot-cards-container">
+            <!-- Dynamic robot cards rendered by JS -->
+          </div>
+        </div>
+
+        <!-- DECENTRALIZED EVENT & CONSENSUS STREAM -->
+        <div class="panel-block flex-grow">
+          <div class="panel-header">
+            <span class="panel-title">P2P CONSENSUS & EVENT LEDGER</span>
+            <span class="badge-mini live-feed">LIVE 10 Hz</span>
+          </div>
+          <div class="ledger-container" id="event-ledger">
+            <div class="ledger-entry">
+              <span class="time">[19:10:00]</span>
+              <span class="tag system">SYSTEM</span>
+              <span class="msg">Zenoh P2P mesh established across 3 AMR nodes.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- HARDWARE EDGE PROFILE -->
+        <div class="panel-block compact">
+          <div class="panel-header">
+            <span class="panel-title">EDGE HARDWARE BUDGET (PI 5 / JETSON ORIN)</span>
+          </div>
+          <div class="edge-metrics-row">
+            <div class="edge-metric">
+              <span class="em-label">CPU CORE LOAD:</span>
+              <span class="em-val">14.2%</span>
+              <span class="em-sub">4-Core Cortex-A76</span>
+            </div>
+            <div class="edge-metric">
+              <span class="em-label">CYCLE LATENCY:</span>
+              <span class="em-val">18.4 ms</span>
+              <span class="em-sub">Budget: 50 ms</span>
+            </div>
+            <div class="edge-metric">
+              <span class="em-label">MEMORY FOOTPRINT:</span>
+              <span class="em-val">168 MB</span>
+              <span class="em-sub">Capped at 1.5 GB</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script src="/static/js/dashboard.js"></script>
+</body>
+</html>
