@@ -47,19 +47,21 @@ current_fleet_state: Dict[str, Any] = {
             {"id": "RACK_D2", "x": 30, "y": 14, "w": 2, "h": 6},
         ],
         "choke_zones": [
-            {"id": "CHOKE_ALPHA", "x": 9.5, "y": 11, "w": 3, "h": 2, "name": "Aisle B1-B2 Bridge (1-Lane)"},
-            {"id": "CHOKE_BETA", "x": 17.5, "y": 11, "w": 3, "h": 2, "name": "Aisle C1-C2 Bridge (1-Lane)"},
-            {"id": "CHOKE_GAMMA", "x": 25.5, "y": 11, "w": 3, "h": 2, "name": "Aisle D1-D2 Bridge (1-Lane)"}
+            {"id": "CHOKE_ALPHA", "x": 5.5, "y": 10.5, "w": 3.0, "h": 3.0, "name": "Rack A Cutout (1-Lane)"},
+            {"id": "CHOKE_BETA", "x": 13.5, "y": 10.5, "w": 3.0, "h": 3.0, "name": "Rack B Cutout (1-Lane)"},
+            {"id": "CHOKE_GAMMA", "x": 21.5, "y": 10.5, "w": 3.0, "h": 3.0, "name": "Rack C Cutout (1-Lane)"},
+            {"id": "CHOKE_DELTA", "x": 29.5, "y": 10.5, "w": 3.0, "h": 3.0, "name": "Rack D Cutout (1-Lane)"}
         ],
         "stations": [
-            {"id": "DOCK_1", "type": "CHARGER", "x": 2, "y": 2, "label": "Dock 1"},
-            {"id": "DOCK_2", "type": "CHARGER", "x": 2, "y": 12, "label": "Dock 2"},
-            {"id": "DOCK_3", "type": "CHARGER", "x": 2, "y": 21, "label": "Dock 3"},
-            {"id": "PICK_1", "type": "PICK", "x": 10, "y": 2, "label": "Pick Bay 1"},
-            {"id": "PICK_2", "type": "PICK", "x": 18, "y": 2, "label": "Pick Bay 2"},
-            {"id": "DROP_1", "type": "DROP", "x": 10, "y": 22, "label": "Outbound Drop 1"},
-            {"id": "DROP_2", "type": "DROP", "x": 18, "y": 22, "label": "Outbound Drop 2"},
-            {"id": "DROP_3", "type": "DROP", "x": 26, "y": 22, "label": "Outbound Drop 3"},
+            {"id": "DOCK_1", "type": "CHARGER", "x": 2.5, "y": 2.0, "label": "Dock 1"},
+            {"id": "DOCK_2", "type": "CHARGER", "x": 2.5, "y": 12.0, "label": "Dock 2"},
+            {"id": "DOCK_3", "type": "CHARGER", "x": 2.5, "y": 22.0, "label": "Dock 3"},
+            {"id": "PICK_1", "type": "PICK", "x": 11.0, "y": 2.0, "label": "Pick Bay 1"},
+            {"id": "PICK_2", "type": "PICK", "x": 19.0, "y": 2.0, "label": "Pick Bay 2"},
+            {"id": "PICK_3", "type": "PICK", "x": 27.0, "y": 2.0, "label": "Pick Bay 3"},
+            {"id": "DROP_1", "type": "DROP", "x": 11.0, "y": 22.0, "label": "Outbound Drop 1"},
+            {"id": "DROP_2", "type": "DROP", "x": 19.0, "y": 22.0, "label": "Outbound Drop 2"},
+            {"id": "DROP_3", "type": "DROP", "x": 27.0, "y": 22.0, "label": "Outbound Drop 3"},
         ],
         "dynamic_obstacles": []
     },
