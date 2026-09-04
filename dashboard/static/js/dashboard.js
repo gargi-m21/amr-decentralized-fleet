@@ -124,15 +124,30 @@ function updateCursorCoord(e) {
   }
 }
 
-// WebSocket connection logic with auto-reconnect
+// WebSocket connection logic with auto-reconnect and HTTP fallback polling
+let pingInterval = null;
+let fallbackPollInterval = null;
+
 function connectWebSocket() {
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
   const wsUrl = `${proto}//${window.location.host}/ws/telemetry`;
   
-  ws = new WebSocket(wsUrl);
+  try {
+    ws = new WebSocket(wsUrl);
+  } catch (e) {
+    startFallbackPolling();
+    return;
+  }
 
   ws.onopen = () => {
     console.log("[P2P Spectator] Connected to fleet stream.");
+    stopFallbackPolling();
+    if (pingInterval) clearInterval(pingInterval);
+    pingInterval = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "ping" }));
+      }
+    }, 10000);
   };
 
   ws.onmessage = (msgEvent) => {
@@ -152,8 +167,40 @@ function connectWebSocket() {
 
   ws.onclose = () => {
     console.warn("[P2P Spectator] Link down. Reconnecting in 1.5s...");
+    if (pingInterval) clearInterval(pingInterval);
+    startFallbackPolling();
     setTimeout(connectWebSocket, 1500);
   };
+
+  ws.onerror = (err) => {
+    console.warn("[P2P Spectator] WebSocket error, engaging HTTP poll:", err);
+    startFallbackPolling();
+  };
+}
+
+function startFallbackPolling() {
+  if (fallbackPollInterval) return;
+  console.log("[P2P Spectator] Starting HTTP fallback polling (150ms)...");
+  fallbackPollInterval = setInterval(() => {
+    fetch("/api/fleet_state")
+      .then(res => res.json())
+      .then(data => {
+        warehouse = data.warehouse;
+        robots = data.robots;
+        networkStats = data.network_stats;
+        events = data.events || [];
+        updateUI();
+      })
+      .catch(() => {});
+  }, 150);
+}
+
+function stopFallbackPolling() {
+  if (fallbackPollInterval) {
+    clearInterval(fallbackPollInterval);
+    fallbackPollInterval = null;
+    console.log("[P2P Spectator] WebSocket active. Fallback polling stopped.");
+  }
 }
 
 // UI updates

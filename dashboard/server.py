@@ -143,6 +143,10 @@ async def broadcast_state():
             disconnected.add(client)
     connected_clients.difference_update(disconnected)
 
+@app.get("/api/fleet_state")
+async def get_fleet_state():
+    return current_fleet_state
+
 @app.websocket("/ws/telemetry")
 async def websocket_telemetry_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -159,6 +163,9 @@ async def websocket_telemetry_endpoint(websocket: WebSocket):
         while True:
             data = await websocket.receive_text()
             msg = json.loads(data)
+            if msg.get("type") == "ping":
+                await websocket.send_text(json.dumps({"type": "pong"}))
+                continue
             if msg.get("action") == "toggle_obstacle":
                 x = msg.get("x", 18.0)
                 y = msg.get("y", 11.0)
